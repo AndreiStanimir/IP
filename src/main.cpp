@@ -1,17 +1,28 @@
 /*
-   Mathieu Stefani, 07 février 2016
-
+   Rares Cristea, 12.03.2021
    Example of a REST endpoint with routing
+   using Mathieu Stefani's example, 07 février 2016
 */
 
 #include <algorithm>
 
-#include <pistache/endpoint.h>
+#include <pistache/net.h>
 #include <pistache/http.h>
+#include <pistache/peer.h>
+#include <pistache/http_headers.h>
+#include <pistache/cookie.h>
 #include <pistache/router.h>
+#include <pistache/endpoint.h>
+#include <pistache/common.h>
 
+#include <signal.h>
+
+using namespace std;
 using namespace Pistache;
 
+// General advice: pay atetntion to the namespaces that you use in various contexts. Could prevent headaches.
+
+// This is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
 void printCookies(const Http::Request &req)
 {
     auto cookies = req.cookies();
@@ -24,6 +35,7 @@ void printCookies(const Http::Request &req)
     std::cout << "]" << std::endl;
 }
 
+// Some generic namespace, with a simple function we could use to test the creation of the endpoints.
 namespace Generic
 {
 
@@ -34,140 +46,195 @@ namespace Generic
 
 }
 
-class StatsEndpoint
+// Definition of the MicrowaveEnpoint class
+class MicrowaveEndpoint
 {
 public:
-    explicit StatsEndpoint(Address addr)
+    explicit MicrowaveEndpoint(Address addr)
         : httpEndpoint(std::make_shared<Http::Endpoint>(addr))
     {
     }
 
+    // Initialization of the server. Additional options can be provided here
     void init(size_t thr = 2)
     {
         auto opts = Http::Endpoint::options()
                         .threads(static_cast<int>(thr));
         httpEndpoint->init(opts);
+        // Server routes are loaded up
         setupRoutes();
     }
 
+    // Server is started threaded.
     void start()
     {
         httpEndpoint->setHandler(router.handler());
-        httpEndpoint->serve();
+        httpEndpoint->serveThreaded();
+    }
+
+    // When signaled server shuts down
+    void stop()
+    {
+        httpEndpoint->shutdown();
     }
 
 private:
     void setupRoutes()
     {
         using namespace Rest;
-
-        Routes::Post(router, "/record/:name/:value?", Routes::bind(&StatsEndpoint::doRecordMetric, this));
-        Routes::Get(router, "/value/:name", Routes::bind(&StatsEndpoint::doGetMetric, this));
+        // Defining various endpoints
+        // Generally say that when http://localhost:9080/ready is called, the handleReady function should be called.
         Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
-        Routes::Get(router, "/auth", Routes::bind(&StatsEndpoint::doAuth, this));
-    }
-
-    void doRecordMetric(const Rest::Request &request, Http::ResponseWriter response)
-    {
-        auto name = request.param(":name").as<std::string>();
-
-        Guard guard(metricsLock);
-        auto it = std::find_if(metrics.begin(), metrics.end(), [&](const Metric &metric) {
-            return metric.name() == name;
-        });
-
-        int val = 1;
-        if (request.hasParam(":value"))
-        {
-            auto value = request.param(":value");
-            val = value.as<int>();
-        }
-
-        if (it == std::end(metrics))
-        {
-            metrics.push_back(Metric(std::move(name), val));
-            response.send(Http::Code::Created, std::to_string(val));
-        }
-        else
-        {
-            auto &metric = *it;
-            metric.incr(val);
-            response.send(Http::Code::Ok, std::to_string(metric.value()));
-        }
-    }
-
-    void doGetMetric(const Rest::Request &request, Http::ResponseWriter response)
-    {
-        auto name = request.param(":name").as<std::string>();
-
-        Guard guard(metricsLock);
-        auto it = std::find_if(metrics.begin(), metrics.end(), [&](const Metric &metric) {
-            return metric.name() == name;
-        });
-
-        if (it == std::end(metrics))
-        {
-            response.send(Http::Code::Not_Found, "Metric does not exist");
-        }
-        else
-        {
-            const auto &metric = *it;
-            response.send(Http::Code::Ok, std::to_string(metric.value()));
-        }
+        Routes::Get(router, "/auth", Routes::bind(&MicrowaveEndpoint::doAuth, this));
+        Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&MicrowaveEndpoint::setSetting, this));
+        Routes::Get(router, "/settings/:settingName/", Routes::bind(&MicrowaveEndpoint::getSetting, this));
     }
 
     void doAuth(const Rest::Request &request, Http::ResponseWriter response)
     {
+        // Function that prints cookies
         printCookies(request);
+        // In the response object, it adds a cookie regarding the communications language.
         response.cookies()
             .add(Http::Cookie("lang", "en-US"));
+        // Send the response
         response.send(Http::Code::Ok);
     }
 
-    class Metric
+    // Endpoint to configure one of the Microwave's settings.
+    void setSetting(const Rest::Request &request, Http::ResponseWriter response)
+    {
+        // You don't know what the parameter content that you receive is, but you should
+        // try to cast it to some data structure. Here, I cast the settingName to string.
+        auto settingName = request.param(":settingName").as<std::string>();
+
+        // This is a guard that prevents editing the same value by two concurent threads.
+        Guard guard(microwaveLock);
+
+        string val = "";
+        if (request.hasParam(":value"))
+        {
+            auto value = request.param(":value");
+            val = value.as<string>();
+        }
+
+        // Setting the microwave's setting to value
+        int setResponse = mwv.set(settingName, val);
+
+        // Sending some confirmation or error response.
+        if (setResponse == 1)
+        {
+            response.send(Http::Code::Ok, settingName + " was set to " + val);
+        }
+        else
+        {
+            response.send(Http::Code::Not_Found, settingName + " was not found and or '" + val + "' was not a valid value ");
+        }
+    }
+
+    // Setting to get the settings value of one of the configurations of the Microwave
+    void getSetting(const Rest::Request &request, Http::ResponseWriter response)
+    {
+        auto settingName = request.param(":settingName").as<std::string>();
+
+        Guard guard(microwaveLock);
+
+        string valueSetting = mwv.get(settingName);
+
+        if (valueSetting != "")
+        {
+
+            // In this response I also add a couple of headers, describing the server that sent this response, and the way the content is formatted.
+            using namespace Http;
+            response.headers()
+                .add<Header::Server>("pistache/0.1")
+                .add<Header::ContentType>(MIME(Text, Plain));
+
+            response.send(Http::Code::Ok, settingName + " is " + valueSetting);
+        }
+        else
+        {
+            response.send(Http::Code::Not_Found, settingName + " was not found");
+        }
+    }
+
+    // Defining the class of the Microwave. It should model the entire configuration of the Microwave
+    class Microwave
     {
     public:
-        explicit Metric(std::string name, int initialValue = 1)
-            : name_(std::move(name)), value_(initialValue)
+        explicit Microwave() {}
+
+        // Setting the value for one of the settings. Hardcoded for the defrosting option
+        int set(std::string name, std::string value)
         {
+            if (name == "defrost")
+            {
+                defrost.name = name;
+                if (value == "true")
+                {
+                    defrost.value = true;
+                    return 1;
+                }
+                if (value == "false")
+                {
+                    defrost.value = false;
+                    return 1;
+                }
+            }
+            return 0;
         }
 
-        int incr(int n = 1)
+        // Getter
+        string get(std::string name)
         {
-            int old = value_;
-            value_ += n;
-            return old;
-        }
-
-        int value() const
-        {
-            return value_;
-        }
-
-        const std::string &name() const
-        {
-            return name_;
+            if (name == "defrost")
+            {
+                return std::to_string(defrost.value);
+            }
+            else
+            {
+                return "";
+            }
         }
 
     private:
-        std::string name_;
-        int value_;
+        // Defining and instantiating settings.
+        struct boolSetting
+        {
+            std::string name;
+            bool value;
+        } defrost;
     };
 
+    // Create the lock which prevents concurrent editing of the same variable
     using Lock = std::mutex;
     using Guard = std::lock_guard<Lock>;
-    Lock metricsLock;
-    std::vector<Metric> metrics;
+    Lock microwaveLock;
 
+    // Instance of the microwave model
+    Microwave mwv;
+
+    // Defining the httpEndpoint and a router.
     std::shared_ptr<Http::Endpoint> httpEndpoint;
     Rest::Router router;
 };
 
 int main(int argc, char *argv[])
 {
-    Port port(9080);
 
-    int thr = 2;
+    // This code is needed for gracefull shutdown of the server when no longer needed.
+    sigset_t signals;
+    if (sigemptyset(&signals) != 0 || sigaddset(&signals, SIGTERM) != 0 || sigaddset(&signals, SIGINT) != 0 || sigaddset(&signals, SIGHUP) != 0 || pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0)
+    {
+        perror("install signal handler failed");
+        return 1;
+    }
+
+    // Set a port on which your server to communicate
+    Port port(9081);
+
+    // Number of threads used by the server
+    int thr = 1;
 
     if (argc >= 2)
     {
@@ -179,11 +246,27 @@ int main(int argc, char *argv[])
 
     Address addr(Ipv4::any(), port);
 
-    std::cout << "Cores = " << hardware_concurrency() << std::endl;
-    std::cout << "Using " << thr << " threads" << std::endl;
+    cout << "Cores = " << hardware_concurrency() << endl;
+    cout << "Using " << thr << " threads" << endl;
 
-    StatsEndpoint stats(addr);
+    // Instance of the class that defines what the server can do.
+    MicrowaveEndpoint stats(addr);
 
+    // Initialize and start the server
     stats.init(thr);
     stats.start();
+
+    // Code that waits for the shutdown sinal for the server
+    int signal = 0;
+    int status = sigwait(&signals, &signal);
+    if (status == 0)
+    {
+        std::cout << "received signal " << signal << std::endl;
+    }
+    else
+    {
+        std::cerr << "sigwait returns " << status << std::endl;
+    }
+
+    stats.stop();
 }
