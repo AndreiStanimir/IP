@@ -15,6 +15,8 @@
 #include <pistache/endpoint.h>
 #include <pistache/common.h>
 
+#include <boost/algorithm/string.hpp>
+
 #include <signal.h>
 
 using namespace std;
@@ -47,10 +49,10 @@ namespace Generic
 }
 
 // Definition of the MicrowaveEnpoint class
-class MicrowaveEndpoint
+class AirPurifierEndpoint
 {
 public:
-    explicit MicrowaveEndpoint(Address addr)
+    explicit AirPurifierEndpoint(Address addr)
         : httpEndpoint(std::make_shared<Http::Endpoint>(addr))
     {
     }
@@ -85,9 +87,9 @@ private:
         // Defining various endpoints
         // Generally say that when http://localhost:9080/ready is called, the handleReady function should be called.
         Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
-        Routes::Get(router, "/auth", Routes::bind(&MicrowaveEndpoint::doAuth, this));
-        Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&MicrowaveEndpoint::setSetting, this));
-        Routes::Get(router, "/settings/:settingName/", Routes::bind(&MicrowaveEndpoint::getSetting, this));
+        Routes::Get(router, "/auth", Routes::bind(&AirPurifierEndpoint::doAuth, this));
+        Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&AirPurifierEndpoint::setSetting, this));
+        Routes::Get(router, "/settings/:settingName/", Routes::bind(&AirPurifierEndpoint::getSetting, this));
     }
 
     void doAuth(const Rest::Request &request, Http::ResponseWriter response)
@@ -101,7 +103,7 @@ private:
         response.send(Http::Code::Ok);
     }
 
-    // Endpoint to configure one of the Microwave's settings.
+    // Endpoint to configure one of the AirPurifier's settings.
     void setSetting(const Rest::Request &request, Http::ResponseWriter response)
     {
         // You don't know what the parameter content that you receive is, but you should
@@ -132,7 +134,7 @@ private:
         }
     }
 
-    // Setting to get the settings value of one of the configurations of the Microwave
+    // Setting to get the settings value of one of the configurations of the AirPurifier
     void getSetting(const Rest::Request &request, Http::ResponseWriter response)
     {
         auto settingName = request.param(":settingName").as<std::string>();
@@ -158,28 +160,108 @@ private:
         }
     }
 
-    // Defining the class of the Microwave. It should model the entire configuration of the Microwave
-    class Microwave
+    // Create the lock which prevents concurrent editing of the same variable
+    using Lock = std::mutex;
+    using Guard = std::lock_guard<Lock>;
+    Lock microwaveLock;
+
+    // Instance of the microwave model
+    class AirPurifier
     {
+    private:
+        // enum CommandsCode
+        // {
+        //     airflow,
+        //     humidity
+        // };
+
+        // const int COMMANDS_LENGTH = 2;
+        // const char *commandsName[2] = {"airflow",
+        //                                "humidity"};
+
+        // boost::unordered_map<CommandsCode, const char *> MyMap = boost::
+
+        enum Power
+        {
+            Off,
+            Low,
+            Medium,
+            High,
+            Auto
+        };
+        Power airflow_level;
+        Power humidity_level;
+        bool isOn;
+        bool switch_power(bool on)
+        {
+            isOn = on;
+            return 1;
+        }
+
     public:
-        explicit Microwave() {}
+        explicit AirPurifier()
+        {
+        }
 
         // Setting the value for one of the settings. Hardcoded for the defrosting option
         int set(std::string name, std::string value)
         {
-            if (name == "defrost")
+            name = boost::algorithm::to_lower(name);
+            value = boost::algorithm::to_lower(value);
+            if (name == "airflow")
             {
-                defrost.name = name;
-                if (value == "true")
+                try
                 {
-                    defrost.value = true;
+                    int power_int = stoi(value);
+                    if (!(power_int >= Off && power_int <= (int)Auto))
+                        return 0;
+                    Power power = static_cast<Power>(power_int);
+                    airflow_level = power;
                     return 1;
                 }
-                if (value == "false")
+                catch (exception e)
                 {
-                    defrost.value = false;
+                    cout << "error";
+                    return 0;
+                }
+            }
+            else if (name == "humiditylevel")
+            {
+                try
+                {
+                    int power_int = stoi(value);
+                    if (!(power_int >= Off && power_int <= (int)Auto))
+                        return 0;
+                    Power power = static_cast<Power>(power_int);
+                    humidity_level = power;
                     return 1;
                 }
+                catch (exception e)
+                {
+                    cout << "error";
+                    return 0;
+                }
+            }
+            else if (name == "shutdown")
+            {
+                try
+                {
+                    int time_in_seconds = stoi(value);
+                    if (time_in_seconds <= 0)
+                    {
+                        switch_power(0);
+                        return 1;
+                    }
+                    return 1;
+                }
+                catch (exception e)
+                {
+                    cout << "error";
+                    return 0;
+                }
+            }
+            else if (name == "poweron")
+            {
             }
             return 0;
         }
@@ -198,21 +280,17 @@ private:
         }
 
     private:
-        // Defining and instantiating settings.
-        struct boolSetting
+        enum PurifierOptions
+            // Defining and instantiating settings.
+            struct boolSetting
         {
             std::string name;
             bool value;
-        } defrost;
+        }
+        defrost;
     };
 
-    // Create the lock which prevents concurrent editing of the same variable
-    using Lock = std::mutex;
-    using Guard = std::lock_guard<Lock>;
-    Lock microwaveLock;
-
-    // Instance of the microwave model
-    Microwave mwv;
+    AirPurifier mwv;
 
     // Defining the httpEndpoint and a router.
     std::shared_ptr<Http::Endpoint> httpEndpoint;
@@ -250,7 +328,7 @@ int main(int argc, char *argv[])
     cout << "Using " << thr << " threads" << endl;
 
     // Instance of the class that defines what the server can do.
-    MicrowaveEndpoint stats(addr);
+    AirPurifierEndpoint stats(addr);
 
     // Initialize and start the server
     stats.init(thr);
