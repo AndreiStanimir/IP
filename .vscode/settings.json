@@ -7,6 +7,20 @@
         "type_traits": "cpp",
         "xlocmon": "cpp",
         "xlocnum": "cpp",
-        "xtr1common": "cpp"
-    }
+        "xtr1common": "cpp",
+        "xstring": "cpp",
+        "new": "cpp",
+        "*.tcc": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "array": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp",
+        "string": "cpp",
+        "iostream": "cpp",
+        "bitset": "cpp",
+        "string_view": "cpp"
+    },
+    "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

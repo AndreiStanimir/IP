@@ -151,7 +151,7 @@ private:
             response.headers()
                 .add<Header::Server>("pistache/0.1")
                 .add<Header::ContentType>(MIME(Text, Plain));
-
+            cout << valueSetting;
             response.send(Http::Code::Ok, settingName + " is " + valueSetting);
         }
         else
@@ -192,22 +192,38 @@ private:
         Power airflow_level;
         Power humidity_level;
         bool isOn;
+        unsigned short air_quality;
+        unsigned short air_humidity;
         bool switch_power(bool on)
         {
             isOn = on;
             return 1;
         }
+        int get_air_quality()
+        {
+            return 42;
+        }
+        int get_humidity_level()
+        {
+            return 42;
+        }
 
     public:
         explicit AirPurifier()
         {
+            airflow_level = Off;
+            humidity_level = Off;
+            isOn = false;
+            air_quality = get_air_quality();
+            air_humidity = get_humidity_level();
         }
 
         // Setting the value for one of the settings. Hardcoded for the defrosting option
         int set(std::string name, std::string value)
         {
-            name = boost::algorithm::to_lower(name);
-            value = boost::algorithm::to_lower(value);
+            boost::algorithm::to_lower(name);
+            boost::algorithm::to_lower(value);
+            cout << name << endl;
             if (name == "airflow")
             {
                 try
@@ -269,25 +285,30 @@ private:
         // Getter
         string get(std::string name)
         {
-            if (name == "defrost")
+            if (name == "all")
             {
-                return std::to_string(defrost.value);
+                return getAll();
+            }
+            else if (name == "airquality")
+            {
+                return to_string(get_air_quality());
+            }
+            else if (name == "humidity")
+            {
+                return to_string(get_humidity_level());
             }
             else
             {
                 return "";
             }
         }
-
-    private:
-        enum PurifierOptions
-            // Defining and instantiating settings.
-            struct boolSetting
+        string getAll()
         {
-            std::string name;
-            bool value;
+            string result = "";
+            result += to_string(isOn) + "\n" + to_string(airflow_level) + "\n" + to_string(humidity_level) + "\n";
+            // result += to_string(isOn) + "\n";
+            return result;
         }
-        defrost;
     };
 
     AirPurifier mwv;

@@ -41,7 +41,7 @@
                     "token-type": "string",
                     "byte-size": 256,
                     "regex-rule": "[a-z]*",
-                    "optional": "false",
+                    "optional": "false"
                 },
                 {
                     "name": "Image",
