@@ -17,6 +17,10 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <boost/date_time/gregorian/gregorian_types.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/asio.hpp>
+
 #include <signal.h>
 
 using namespace std;
@@ -47,6 +51,9 @@ namespace Generic
     }
 
 }
+namespace gregorian = boost::gregorian;
+namespace posix_time = boost::posix_time;
+namespace asio = boost::asio;
 
 // Definition of the MicrowaveEnpoint class
 class AirPurifierEndpoint
@@ -166,151 +173,8 @@ private:
     Lock microwaveLock;
 
     // Instance of the microwave model
-    class AirPurifier
-    {
-    private:
-        // enum CommandsCode
-        // {
-        //     airflow,
-        //     humidity
-        // };
 
-        // const int COMMANDS_LENGTH = 2;
-        // const char *commandsName[2] = {"airflow",
-        //                                "humidity"};
-
-        // boost::unordered_map<CommandsCode, const char *> MyMap = boost::
-
-        enum Power
-        {
-            Off,
-            Low,
-            Medium,
-            High,
-            Auto
-        };
-        Power airflow_level;
-        Power humidity_level;
-        bool isOn;
-        unsigned short air_quality;
-        unsigned short air_humidity;
-        bool switch_power(bool on)
-        {
-            isOn = on;
-            return 1;
-        }
-        int get_air_quality()
-        {
-            return 42;
-        }
-        int get_humidity_level()
-        {
-            return 42;
-        }
-
-    public:
-        explicit AirPurifier()
-        {
-            airflow_level = Off;
-            humidity_level = Off;
-            isOn = false;
-            air_quality = get_air_quality();
-            air_humidity = get_humidity_level();
-        }
-
-        // Setting the value for one of the settings. Hardcoded for the defrosting option
-        int set(std::string name, std::string value)
-        {
-            boost::algorithm::to_lower(name);
-            boost::algorithm::to_lower(value);
-            cout << name << endl;
-            if (name == "airflow")
-            {
-                try
-                {
-                    int power_int = stoi(value);
-                    if (!(power_int >= Off && power_int <= (int)Auto))
-                        return 0;
-                    Power power = static_cast<Power>(power_int);
-                    airflow_level = power;
-                    return 1;
-                }
-                catch (exception e)
-                {
-                    cout << "error";
-                    return 0;
-                }
-            }
-            else if (name == "humiditylevel")
-            {
-                try
-                {
-                    int power_int = stoi(value);
-                    if (!(power_int >= Off && power_int <= (int)Auto))
-                        return 0;
-                    Power power = static_cast<Power>(power_int);
-                    humidity_level = power;
-                    return 1;
-                }
-                catch (exception e)
-                {
-                    cout << "error";
-                    return 0;
-                }
-            }
-            else if (name == "shutdown")
-            {
-                try
-                {
-                    int time_in_seconds = stoi(value);
-                    if (time_in_seconds <= 0)
-                    {
-                        switch_power(0);
-                        return 1;
-                    }
-                    return 1;
-                }
-                catch (exception e)
-                {
-                    cout << "error";
-                    return 0;
-                }
-            }
-            else if (name == "poweron")
-            {
-            }
-            return 0;
-        }
-
-        // Getter
-        string get(std::string name)
-        {
-            if (name == "all")
-            {
-                return getAll();
-            }
-            else if (name == "airquality")
-            {
-                return to_string(get_air_quality());
-            }
-            else if (name == "humidity")
-            {
-                return to_string(get_humidity_level());
-            }
-            else
-            {
-                return "";
-            }
-        }
-        string getAll()
-        {
-            string result = "";
-            result += to_string(isOn) + "\n" + to_string(airflow_level) + "\n" + to_string(humidity_level) + "\n";
-            // result += to_string(isOn) + "\n";
-            return result;
-        }
-    };
-
+    
     AirPurifier mwv;
 
     // Defining the httpEndpoint and a router.
@@ -318,35 +182,8 @@ private:
     Rest::Router router;
 };
 
-int main(int argc, char *argv[])
+void httpServer(Address addr, Port port, int thr, sigset_t signals)
 {
-
-    // This code is needed for gracefull shutdown of the server when no longer needed.
-    sigset_t signals;
-    if (sigemptyset(&signals) != 0 || sigaddset(&signals, SIGTERM) != 0 || sigaddset(&signals, SIGINT) != 0 || sigaddset(&signals, SIGHUP) != 0 || pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0)
-    {
-        perror("install signal handler failed");
-        return 1;
-    }
-
-    // Set a port on which your server to communicate
-    Port port(9081);
-
-    // Number of threads used by the server
-    int thr = 1;
-
-    if (argc >= 2)
-    {
-        port = static_cast<uint16_t>(std::stol(argv[1]));
-
-        if (argc == 3)
-            thr = std::stoi(argv[2]);
-    }
-
-    Address addr(Ipv4::any(), port);
-
-    cout << "Cores = " << hardware_concurrency() << endl;
-    cout << "Using " << thr << " threads" << endl;
 
     // Instance of the class that defines what the server can do.
     AirPurifierEndpoint stats(addr);
@@ -368,4 +205,36 @@ int main(int argc, char *argv[])
     }
 
     stats.stop();
+}
+
+int main(int argc, char *argv[])
+{
+    // This code is needed for gracefull shutdown of the server when no longer needed.
+    sigset_t signals;
+    if (sigemptyset(&signals) != 0 || sigaddset(&signals, SIGTERM) != 0 || sigaddset(&signals, SIGINT) != 0 || sigaddset(&signals, SIGHUP) != 0 || pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0)
+    {
+        perror("install signal handler failed");
+        return 1;
+    }
+    // Set a port on which your server to communicate
+    Port port(9081);
+
+    // Number of threads used by the server
+    int thr = 1;
+
+    if (argc >= 2)
+    {
+        port = static_cast<uint16_t>(std::stol(argv[1]));
+
+        if (argc == 3)
+            thr = std::stoi(argv[2]);
+    }
+
+    Address addr(Ipv4::any(), port);
+
+    std::thread thread_htpp(httpServer, addr, port, thr, signals);
+
+    cout << "Cores = " << hardware_concurrency() << endl;
+    cout << "Using " << thr << " threads" << endl;
+    thread_htpp.join();
 }
