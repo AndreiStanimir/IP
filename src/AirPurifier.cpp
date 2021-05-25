@@ -37,7 +37,9 @@ int AirPurifier::fillWaterTank(float water)
     if (water > 0)
     {
         waterTank += water;
+        return 1;
     }
+    return 0;
 }
 
 int AirPurifier::set(std::string name, std::string value)

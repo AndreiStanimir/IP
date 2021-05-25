@@ -104,7 +104,9 @@ public:
         if (water > 0)
         {
             waterTank += water;
+            return 1;
         }
+        return 0;
     }
     int get_air_quality()
     {
@@ -419,7 +421,7 @@ int main(int argc, char *argv[])
     Port port(9081);
 
     // Number of threads used by the server
-    int thr = 1;
+    int thr = 2;
 
     if (argc >= 2)
     {

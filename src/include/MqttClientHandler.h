@@ -30,7 +30,7 @@ https://github.com/eclipse/paho.mqtt.cpp/blob/master/src/samples/async_publish.c
 #define WATER_SUBSCRIBER 1
 #define CLIENT_ID_WATER_SUBSCRIBER "water-subscriber"
 #define WATER_SUBSCRIBER_TOPIC "airpurifier/water-subscriber"
-#define ADDITIONAL_INFO_SUBSCRIBER_TOPIC "smart_pot/info"
+#define ADDITIONAL_INFO_SUBSCRIBER_TOPIC "airpurifier/info"
 
 // publishers info`s
 #define WATER_PUBLISHER 3
@@ -38,7 +38,7 @@ https://github.com/eclipse/paho.mqtt.cpp/blob/master/src/samples/async_publish.c
 #define CLIENT_ID_WATER_PUBLISHER "water-publisher"
 #define CLIENT_ID_DISPLAY_PUBLISHER "display-publisher"
 #define WATER_PUBLISHER_TOPIC "airpurifier/water-publish"
-#define DISPLAY_PUBLISHER_TOPIC "smart_pot/display"
+#define DISPLAY_PUBLISHER_TOPIC "airpurifier/display"
 
 class MqttClientHandler
 {
