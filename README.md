@@ -69,7 +69,7 @@ $ cmake -DCMAKE_CXX_COMPILER=clang++
 ## 
 Copy libpistache.so.0.0 inside src direcotory
 
-Build final app
+Build 
 ```
 cd src
 make
