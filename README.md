@@ -2,7 +2,7 @@
 Install prerequisites
 
 ```
-$ sudo apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui
+$ sudo apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui libboost-all-dev g++
 ```
 
 #### Building the Paho C library
