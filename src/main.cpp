@@ -23,6 +23,8 @@
 
 #include <signal.h>
 
+#include "include/AirPurifier.h"
+#include "include/MqttClientHandler.h"
 using namespace std;
 using namespace Pistache;
 
@@ -62,6 +64,7 @@ public:
     explicit AirPurifierEndpoint(Address addr)
         : httpEndpoint(std::make_shared<Http::Endpoint>(addr))
     {
+        airpurifier = AirPurifier::getInstance();
     }
 
     // Initialization of the server. Additional options can be provided here
@@ -95,7 +98,7 @@ private:
         // Generally say that when http://localhost:9080/ready is called, the handleReady function should be called.
         Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
         Routes::Get(router, "/auth", Routes::bind(&AirPurifierEndpoint::doAuth, this));
-        Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&AirPurifierEndpoint::setSetting, this));
+        Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&AirPurifierEndpoint ::setSetting, this));
         Routes::Get(router, "/settings/:settingName/", Routes::bind(&AirPurifierEndpoint::getSetting, this));
     }
 
@@ -128,7 +131,8 @@ private:
         }
 
         // Setting the microwave's setting to value
-        int setResponse = mwv.set(settingName, val);
+        airpurifier = AirPurifier::getInstance();
+        int setResponse = airpurifier->set(settingName, val);
 
         // Sending some confirmation or error response.
         if (setResponse == 1)
@@ -147,8 +151,8 @@ private:
         auto settingName = request.param(":settingName").as<std::string>();
 
         Guard guard(microwaveLock);
-
-        string valueSetting = mwv.get(settingName);
+        airpurifier = AirPurifier::getInstance();
+        string valueSetting = airpurifier->get(settingName);
 
         if (valueSetting != "")
         {
@@ -172,10 +176,9 @@ private:
     using Guard = std::lock_guard<Lock>;
     Lock microwaveLock;
 
-    // Instance of the microwave model
+    // Instance of the air purifier model
 
-    
-    AirPurifier mwv;
+    AirPurifier *airpurifier = nullptr;
 
     // Defining the httpEndpoint and a router.
     std::shared_ptr<Http::Endpoint> httpEndpoint;
@@ -207,6 +210,22 @@ void httpServer(Address addr, Port port, int thr, sigset_t signals)
     stats.stop();
 }
 
+void MQTTServer()
+{
+    // const int timeout = 2;
+    // std::cout << "\n[MQTT] Starting MQTT clients ..." << std::endl;
+    // std::thread waterSubscriber(MqttClientHandler::startSubscriber, WATER_SUBSCRIBER);
+    // std::this_thread::sleep_for(std::chrono::seconds(timeout));
+    // std::thread waterPublisher(MqttClientHandler::startPublisher, WATER_PUBLISHER);
+    // std::this_thread::sleep_for(std::chrono::seconds(timeout));
+    // // std::thread displayPublisher(MqttClientHandler::startPublisher, DISPLAY_PUBLISHER);
+    // // std::this_thread::sleep_for(std::chrono::seconds(TIMEOUT));
+    // std::cout << "\n[MQTT] MQTT clients started" << std::endl;
+
+    // waterSubscriber.join();
+    // waterPublisher.join();
+}
+
 int main(int argc, char *argv[])
 {
     // This code is needed for gracefull shutdown of the server when no longer needed.
@@ -234,7 +253,11 @@ int main(int argc, char *argv[])
 
     std::thread thread_htpp(httpServer, addr, port, thr, signals);
 
+    std::thread thread_mqtt(MQTTServer);
+
     cout << "Cores = " << hardware_concurrency() << endl;
     cout << "Using " << thr << " threads" << endl;
+
     thread_htpp.join();
+    thread_mqtt.join();
 }
