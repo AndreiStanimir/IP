@@ -133,6 +133,18 @@ public:
         boost::algorithm::to_lower(name);
         boost::algorithm::to_lower(value);
         cout << name << endl;
+
+        if (name == "poweron")
+        {
+            // if ()
+            switch_power(!isOn);
+            return 1;
+        }
+        if (!isOn)
+        {
+            cout << "device is not on\n";
+            return 0;
+        }
         if (name == "airflow")
         {
             try
