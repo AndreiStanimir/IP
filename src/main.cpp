@@ -5,7 +5,7 @@
 */
 
 #include <algorithm>
-
+#include <fstream>
 #include <pistache/net.h>
 #include <pistache/http.h>
 #include <pistache/peer.h>
@@ -23,7 +23,7 @@
 
 #include <signal.h>
 
-#include "include/AirPurifier.h"
+// #include "include/AirPurifier.h"
 #include "include/MqttClientHandler.h"
 using namespace std;
 using namespace Pistache;
@@ -57,7 +57,185 @@ namespace gregorian = boost::gregorian;
 namespace posix_time = boost::posix_time;
 namespace asio = boost::asio;
 
-// Definition of the MicrowaveEnpoint class
+class AirPurifier
+{
+private:
+    // asio::io_service io_service_;
+    // asio::deadline_timer timerTurnOn;
+    enum Power
+    {
+        Off,
+        Low,
+        Medium,
+        High,
+        Auto
+    };
+    Power airflow_level;
+    Power humidity_level;
+    bool isOn;
+    float waterTank;
+    unsigned short air_quality;
+    unsigned short air_humidity;
+
+    static AirPurifier *instance;
+
+public:
+    AirPurifier()
+    {
+        airflow_level = Off;
+        humidity_level = Off;
+        isOn = false;
+        air_quality = get_air_quality();
+        air_humidity = get_humidity_level();
+        waterTank = 0;
+    }
+    static AirPurifier &getInstance()
+    {
+        static AirPurifier i;
+        return i;
+    }
+    bool switch_power(bool on)
+    {
+        isOn = on;
+        return 1;
+    }
+    int fillWaterTank(float water)
+    {
+        if (water > 0)
+        {
+            waterTank += water;
+        }
+    }
+    int get_air_quality()
+    {
+        return 42;
+    }
+    int get_humidity_level()
+    {
+        return 10;
+    }
+    float getWaterTankLevel()
+    {
+        return 2.3;
+    }
+
+    bool connectToWifi(std::string ip, std::string password)
+    {
+        cout << "Connected to wifi :" << ip;
+        return true;
+    }
+    // Setting the value for one of the settings. Hardcoded for the defrosting option
+    int set(std::string name, std::string value)
+    {
+        boost::algorithm::to_lower(name);
+        boost::algorithm::to_lower(value);
+        cout << name << endl;
+        if (name == "airflow")
+        {
+            try
+            {
+                int power_int = stoi(value);
+                if (!(power_int >= Off && power_int <= (int)Auto))
+                    return 0;
+                Power power = static_cast<Power>(power_int);
+                airflow_level = power;
+                return 1;
+            }
+            catch (exception e)
+            {
+                cout << "error";
+                return 0;
+            }
+        }
+        else if (name == "humiditylevel")
+        {
+            try
+            {
+                int power_int = stoi(value);
+                if (!(power_int >= Off && power_int <= (int)Auto))
+                    return 0;
+                Power power = static_cast<Power>(power_int);
+                humidity_level = power;
+                return 1;
+            }
+            catch (exception e)
+            {
+                cout << "error";
+                return 0;
+            }
+        }
+        else if (name == "shutdown")
+        {
+            try
+            {
+                int time_in_seconds = stoi(value);
+                if (time_in_seconds <= 0)
+                {
+                    switch_power(0);
+                    return 1;
+                }
+                return 1;
+            }
+            catch (exception e)
+            {
+                cout << "error";
+                return 0;
+            }
+        }
+        else if (name == "poweron")
+        {
+            // if ()
+            switch_power(!isOn);
+        }
+        else if (name == "addwater")
+        {
+            try
+            {
+                fillWaterTank(2);
+            }
+            catch (exception e)
+            {
+                cout << "error";
+                return 0;
+            }
+        }
+        return 0;
+    }
+    // Getter
+    std::string get(std::string name)
+    {
+        if (name == "all")
+        {
+            return getAll();
+        }
+        else if (name == "airquality")
+        {
+            return to_string(get_air_quality());
+        }
+        else if (name == "humidity")
+        {
+            return to_string(get_humidity_level());
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+    std::string getAll()
+    {
+        string result = "";
+        result += "power\n" + to_string(isOn) + "\n" + "airflow\n" + to_string(airflow_level) + "\n" +
+                  "humidity\n" + to_string(humidity_level) + "\n";
+        std::fstream fout;
+        fout.open("log.txt", std::ios_base::app);
+        std::time_t t = std::time(0);
+        fout << std::ctime(&t);
+        fout << result;
+        fout.close();
+        return result;
+    }
+};
 class AirPurifierEndpoint
 {
 public:
@@ -123,7 +301,7 @@ private:
         // This is a guard that prevents editing the same value by two concurent threads.
         Guard guard(microwaveLock);
 
-        string val = "";
+        std::string val = "";
         if (request.hasParam(":value"))
         {
             auto value = request.param(":value");
@@ -131,8 +309,8 @@ private:
         }
 
         // Setting the microwave's setting to value
-        airpurifier = AirPurifier::getInstance();
-        int setResponse = airpurifier->set(settingName, val);
+        // airpurifier = AirPurifier::getInstance();
+        int setResponse = airpurifier.set(settingName, val);
 
         // Sending some confirmation or error response.
         if (setResponse == 1)
@@ -151,8 +329,8 @@ private:
         auto settingName = request.param(":settingName").as<std::string>();
 
         Guard guard(microwaveLock);
-        airpurifier = AirPurifier::getInstance();
-        string valueSetting = airpurifier->get(settingName);
+        // airpurifier = AirPurifier::getInstance();
+        string valueSetting = airpurifier.get(settingName);
 
         if (valueSetting != "")
         {
@@ -178,7 +356,7 @@ private:
 
     // Instance of the air purifier model
 
-    AirPurifier *airpurifier = nullptr;
+    AirPurifier airpurifier;
 
     // Defining the httpEndpoint and a router.
     std::shared_ptr<Http::Endpoint> httpEndpoint;
@@ -228,6 +406,8 @@ void MQTTServer()
 
 int main(int argc, char *argv[])
 {
+    AirPurifier::getInstance();
+
     // This code is needed for gracefull shutdown of the server when no longer needed.
     sigset_t signals;
     if (sigemptyset(&signals) != 0 || sigaddset(&signals, SIGTERM) != 0 || sigaddset(&signals, SIGINT) != 0 || sigaddset(&signals, SIGHUP) != 0 || pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0)

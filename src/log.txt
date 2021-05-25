@@ -1,0 +1,21 @@
+Tue May 25 13:25:04 2021
+power
+0
+airflow
+0
+humidity
+0
+Tue May 25 13:25:39 2021
+power
+0
+airflow
+0
+humidity
+0
+Tue May 25 13:25:48 2021
+power
+1
+airflow
+1
+humidity
+0
