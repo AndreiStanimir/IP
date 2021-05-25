@@ -4,16 +4,16 @@
     "buffers-count": 5,
     "input-buffers": {
         "1": {
-            "token-delimitators": "/", //Symbol that separates the tokens in the buffer
-            "protocol": "HTTP", // The protocol used to communicate with this buffer
-            "prefix": "http://127.0.0.1:9081/settings/", // The buffer requires that it is initialized with this content
-            "buffer-tokens": [ // Description of each of the tokens that this buffer can receive. Think of them as the message's variables.
+            "token-delimitators": "/",
+            "protocol": "HTTP",
+            "prefix": "http://127.0.0.1:9081/settings/",
+            "buffer-tokens": [
                 {
                     "name": "Air purifier command",
                     "description": "Input that selects command",
                     "token-type": "string",
                     "byte-size": 20,
-                    "regex-rule": "(airflow)|(humiditylevel)",
+                    "regex-rule": "(airflow)|(humiditylevel)|(addwater)",
                     "optional": false
                 },
                 {
@@ -21,16 +21,16 @@
                     "description": "Parameters for the command chosen",
                     "token-type": "string",
                     "byte-size": 4,
-                    "regex-rule": "=[0-5]",
+                    "regex-rule": "=[0-4]",
                     "optional": true
                 }
             ]
         }
         "2": {
-            "token-delimitators": "/", //Symbol that separates the tokens in the buffer
-            "protocol": "HTTP", // The protocol used to communicate with this buffer
-            "prefix": "http://127.0.0.1:9081/settings/", // The buffer requires that it is initialized with this content
-            "buffer-tokens": [ // Description of each of the tokens that this buffer can receive. Think of them as the message's variables.
+            "token-delimitators": "/",
+            "protocol": "HTTP",
+            "prefix": "http://127.0.0.1:9081/settings/",
+            "buffer-tokens": [
                 {
                     "name": "Air purifier command",
                     "description": "Input that selects command",
@@ -54,9 +54,8 @@
         "1": {
             "token-delimitators": "/",
             "protocol": "HTTP",
-            "prefix": "http://127.0.0.1:9081/settings", // The buffer requires that it is initialized with this content
-            "caller": "remote", // Remote or Local. The caller variable describes who runs this buffer. Either
-            // your app sends the data (local), or the data is requested by another device (remote)
+            "prefix": "http://127.0.0.1:9081/settings",
+            "caller": "remote",
             "buffer-tokens": [
                 {
                     "name": "Get Data",

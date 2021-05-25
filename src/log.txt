@@ -26,3 +26,27 @@ airflow
 2
 humidity
 0
+Tue May 25 19:38:54 2021
+power
+1
+airflow
+0
+humidity
+1
+Tue May 25 19:43:40 2021
+power 1
+airflow 2
+humidity 0
+Tue May 25 19:51:57 2021
+power 0
+airflow 0
+humidity 0
+water tank: 5.000000Tue May 25 19:52:18 2021
+power 0
+airflow 0
+humidity 0
+water tank: 0.000000Tue May 25 19:52:35 2021
+power 0
+airflow 0
+humidity 0
+water tank: 4.000000

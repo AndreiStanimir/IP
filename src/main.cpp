@@ -104,6 +104,7 @@ public:
         if (water > 0)
         {
             waterTank += water;
+            waterTank = min(5.0f, waterTank);
             return 1;
         }
         return 0;
@@ -118,7 +119,7 @@ public:
     }
     float getWaterTankLevel()
     {
-        return 2.3;
+        return waterTank;
     }
 
     bool connectToWifi(std::string ip, std::string password)
@@ -188,12 +189,14 @@ public:
         {
             // if ()
             switch_power(!isOn);
+            return 1;
         }
         else if (name == "addwater")
         {
             try
             {
                 fillWaterTank(2);
+                return 1;
             }
             catch (exception e)
             {
@@ -227,8 +230,9 @@ public:
     std::string getAll()
     {
         string result = "";
-        result += "power\n" + to_string(isOn) + "\n" + "airflow\n" + to_string(airflow_level) + "\n" +
-                  "humidity\n" + to_string(humidity_level) + "\n";
+        result += "power " + to_string(isOn) + "\n" + "airflow " + to_string(airflow_level) + "\n" +
+                  "humidity " + to_string(humidity_level) + "\n" +
+                  "water tank: " + to_string(waterTank);
         std::fstream fout;
         fout.open("log.txt", std::ios_base::app);
         std::time_t t = std::time(0);
