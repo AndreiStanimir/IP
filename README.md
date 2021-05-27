@@ -14,7 +14,8 @@ sudo apt install libpistache-dev
 ```
 Build 
 ```
-cd src
+git clone https://github.com/AndreiStanimir/IP.git
+cd IP/src
 make
 ```
 Run
