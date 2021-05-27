@@ -65,4 +65,25 @@ water tank: 2.000000Tue May 25 20:30:21 2021
 power 0
 airflow 0
 humidity 1
-water tank: 4.000000
+water tank: 4.000000Thu May 27 21:16:30 2021
+power 1
+airflow 0
+humidity 0
+water tank: 0.000000Thu May 27 21:57:47 2021
+power 1
+airflow 2
+humidity 0
+water tank: 0.000000Thu May 27 23:04:22 2021
+power 1
+airflow power 0
+humidity power 0
+water tank: 0.000000
+air quality 3
+air humidity 10
+Thu May 27 23:05:11 2021
+power 1
+airflow power 1
+humidity power 0
+water tank: 0.000000
+air quality 91
+air humidity 10

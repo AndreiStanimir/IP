@@ -24,7 +24,7 @@
 #include <signal.h>
 
 // #include "include/AirPurifier.h"
-#include "include/MqttClientHandler.h"
+//#include "include/MqttClientHandler.h"
 using namespace std;
 using namespace Pistache;
 
@@ -68,14 +68,18 @@ private:
         Low,
         Medium,
         High,
-        Auto
+        Maximum
     };
     Power airflow_level;
     Power humidity_level;
     bool isOn;
+    bool autoPurify;
     float waterTank;
     unsigned short air_quality;
     unsigned short air_humidity;
+
+#define THRESHOLDS_LENGTH 5
+    int PURITY_THRESHOLD[THRESHOLDS_LENGTH] = {95, 80, 50, 30, 5};
 
     static AirPurifier *instance;
 
@@ -85,10 +89,41 @@ public:
         airflow_level = Off;
         humidity_level = Off;
         isOn = false;
-        air_quality = get_air_quality();
+        air_quality = 0;
         air_humidity = get_humidity_level();
+        autoPurify = false;
         waterTank = 0;
     }
+    Power getAirflow()
+    {
+        return airflow_level;
+    }
+    bool isAuto()
+    {
+        return autoPurify;
+    }
+    bool updateAutoAirflow()
+    {
+        int quality = get_air_quality();
+        for (int i = 0; i < THRESHOLDS_LENGTH; i++)
+        {
+
+            if (quality > PURITY_THRESHOLD[i])
+            {
+                if (airflow_level != (Power)i)
+                {
+                    airflow_level = (Power)i;
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
     static AirPurifier &getInstance()
     {
         static AirPurifier i;
@@ -111,7 +146,10 @@ public:
     }
     int get_air_quality()
     {
-        return 42;
+        air_quality = air_quality + rand() % 12 - 4;
+        air_quality=max(air_quality,(unsigned short)0);
+        air_quality=min(air_quality,(unsigned short)100);
+        return air_quality;
     }
     int get_humidity_level()
     {
@@ -137,7 +175,7 @@ public:
         if (name == "poweron")
         {
             // if ()
-            switch_power(!isOn);
+            switch_power(value != "0"); // convert value to bool
             return 1;
         }
         if (!isOn)
@@ -150,7 +188,7 @@ public:
             try
             {
                 int power_int = stoi(value);
-                if (!(power_int >= Off && power_int <= (int)Auto))
+                if (!(power_int >= Off && power_int <= (int)Maximum))
                     return 0;
                 Power power = static_cast<Power>(power_int);
                 airflow_level = power;
@@ -167,7 +205,7 @@ public:
             try
             {
                 int power_int = stoi(value);
-                if (!(power_int >= Off && power_int <= (int)Auto))
+                if (!(power_int >= Off && power_int <= (int)Maximum))
                     return 0;
                 Power power = static_cast<Power>(power_int);
                 humidity_level = power;
@@ -216,11 +254,28 @@ public:
                 return 0;
             }
         }
+        else if (name == "auto")
+        {
+            try
+            {
+                autoPurify = value != "0";
+                return 1;
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << e.what() << '\n';
+            }
+        }
         return 0;
     }
     // Getter
     std::string get(std::string name)
     {
+        if (!isOn)
+        {
+            cout << "device is not on\n";
+            return 0;
+        }
         if (name == "all")
         {
             return getAll();
@@ -242,9 +297,11 @@ public:
     std::string getAll()
     {
         string result = "";
-        result += "power " + to_string(isOn) + "\n" + "airflow " + to_string(airflow_level) + "\n" +
-                  "humidity " + to_string(humidity_level) + "\n" +
-                  "water tank: " + to_string(waterTank);
+        result += "power " + to_string(isOn) + "\n" + "airflow power " + to_string(airflow_level) + "\n" +
+                  "humidity power " + to_string(humidity_level) + "\n" +
+                  "water tank: " + to_string(waterTank) + "\n" +
+                  "air quality " + to_string(get_air_quality()) + "\n" +
+                  "air humidity " + to_string(get_humidity_level()) + "\n";
         std::fstream fout;
         fout.open("log.txt", std::ios_base::app);
         std::time_t t = std::time(0);
@@ -284,6 +341,11 @@ public:
     void stop()
     {
         httpEndpoint->shutdown();
+    }
+
+    AirPurifier &getAirPurifier()
+    {
+        return airpurifier;
     }
 
 private:
@@ -381,15 +443,12 @@ private:
     Rest::Router router;
 };
 
-void httpServer(Address addr, Port port, int thr, sigset_t signals)
+void httpServer(AirPurifierEndpoint *airpurifierEndpoint, Address addr, Port port, int thr, sigset_t signals)
 {
 
-    // Instance of the class that defines what the server can do.
-    AirPurifierEndpoint stats(addr);
-
     // Initialize and start the server
-    stats.init(thr);
-    stats.start();
+    airpurifierEndpoint->init(thr);
+    airpurifierEndpoint->start();
 
     // Code that waits for the shutdown sinal for the server
     int signal = 0;
@@ -403,25 +462,43 @@ void httpServer(Address addr, Port port, int thr, sigset_t signals)
         std::cerr << "sigwait returns " << status << std::endl;
     }
 
-    stats.stop();
+    airpurifierEndpoint->stop();
 }
 
-void MQTTServer()
+void updateAutoAirflowTask(AirPurifierEndpoint *airPurifierEndpoint, sigset_t signals)
 {
-    // const int timeout = 2;
-    // std::cout << "\n[MQTT] Starting MQTT clients ..." << std::endl;
-    // std::thread waterSubscriber(MqttClientHandler::startSubscriber, WATER_SUBSCRIBER);
-    // std::this_thread::sleep_for(std::chrono::seconds(timeout));
-    // std::thread waterPublisher(MqttClientHandler::startPublisher, WATER_PUBLISHER);
-    // std::this_thread::sleep_for(std::chrono::seconds(timeout));
-    // // std::thread displayPublisher(MqttClientHandler::startPublisher, DISPLAY_PUBLISHER);
-    // // std::this_thread::sleep_for(std::chrono::seconds(TIMEOUT));
-    // std::cout << "\n[MQTT] MQTT clients started" << std::endl;
-
-    // waterSubscriber.join();
-    // waterPublisher.join();
+    AirPurifier &airpurifier = airPurifierEndpoint->getAirPurifier();
+    while (true)
+    {
+        if (airpurifier.isAuto())
+        {
+            cout << "Current air quality: " << airpurifier.get_air_quality() << "\n";
+            bool hasUpdated = airpurifier.updateAutoAirflow();
+            if (hasUpdated)
+            {
+                cout << "Airflow speed updated to " + to_string(airpurifier.getAirflow()) + "\n";
+            }
+        }
+        //sigset_t signals;
+        siginfo_t *signal;
+        timespec time;
+        time.tv_sec = 1;
+        time.tv_nsec = 0;
+        int status = sigtimedwait(&signals, signal, &time);
+        if (status == 0)
+        {
+            std::cout << "received signal " << signal << std::endl;
+            // break;
+        }
+        else
+        {
+            //std::cerr << "sigwait returns " << status << std::endl;
+            if(status==2)
+                break;
+        }
+        sleep(1);
+    }
 }
-
 int main(int argc, char *argv[])
 {
     AirPurifier::getInstance();
@@ -449,13 +526,16 @@ int main(int argc, char *argv[])
 
     Address addr(Ipv4::any(), port);
 
-    std::thread thread_htpp(httpServer, addr, port, thr, signals);
+    // Instance of the class that defines what the server can do.
+    AirPurifierEndpoint *airPurifier = new AirPurifierEndpoint(addr);
 
-    std::thread thread_mqtt(MQTTServer);
+    std::thread thread_htpp(httpServer, airPurifier, addr, port, thr, signals);
+
+    std::thread threadUpdateAutoAirflow(updateAutoAirflowTask, airPurifier,signals);
 
     cout << "Cores = " << hardware_concurrency() << endl;
     cout << "Using " << thr << " threads" << endl;
 
     thread_htpp.join();
-    thread_mqtt.join();
+    threadUpdateAutoAirflow.join();
 }
